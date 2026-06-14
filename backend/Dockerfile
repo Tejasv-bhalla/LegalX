@@ -9,11 +9,11 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends build-essential && rm -rf /var/lib/apt/lists/*
 
 # Install dependencies using uv
-COPY requirements.txt .
+COPY backend/requirements.txt .
 RUN uv pip install --system --no-cache -r requirements.txt
 
-# Copy application code (including pre-populated SQLite DB)
-COPY . .
+# Copy application code from backend subdirectory to container app directory
+COPY backend/ .
 
 # Warm up the local embedding model cache
 RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('BAAI/bge-small-en-v1.5')"
