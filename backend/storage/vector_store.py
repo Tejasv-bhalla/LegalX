@@ -21,38 +21,47 @@ def get_embedding_model():
         logger.info("FastEmbed embedding model loaded successfully.")
     return _embeddings_instance
 
+_qdrant_client_instance = None
+_vector_store_instance = None
+
 def get_qdrant_client() -> QdrantClient:
-    return QdrantClient(
-        url=settings.qdrant_url,
-        api_key=settings.qdrant_api_key
-    )
+    global _qdrant_client_instance
+    if _qdrant_client_instance is None:
+        _qdrant_client_instance = QdrantClient(
+            url=settings.qdrant_url,
+            api_key=settings.qdrant_api_key
+        )
+    return _qdrant_client_instance
 
 def init_vector_store() -> QdrantVectorStore:
-    client = get_qdrant_client()
-    collection_name = settings.qdrant_collection
-    
-    # Check if collection exists, create if not
-    try:
-        if not client.collection_exists(collection_name):
-            logger.info(f"Collection '{collection_name}' does not exist. Creating...")
-            client.create_collection(
-                collection_name=collection_name,
-                vectors_config=VectorParams(
-                    size=384,  # bge-small output dimensions
-                    distance=Distance.COSINE
-                )
-            )
-            logger.info(f"Collection '{collection_name}' created successfully.")
-    except Exception as e:
-        logger.error(f"Failed to verify/create Qdrant collection: {e}")
-        raise e
+    global _vector_store_instance
+    if _vector_store_instance is None:
+        client = get_qdrant_client()
+        collection_name = settings.qdrant_collection
         
-    embeddings = get_embedding_model()
-    return QdrantVectorStore(
-        client=client,
-        collection_name=collection_name,
-        embedding=embeddings
-    )
+        # Check if collection exists, create if not (only once on startup/first load)
+        try:
+            if not client.collection_exists(collection_name):
+                logger.info(f"Collection '{collection_name}' does not exist. Creating...")
+                client.create_collection(
+                    collection_name=collection_name,
+                    vectors_config=VectorParams(
+                        size=384,  # bge-small output dimensions
+                        distance=Distance.COSINE
+                    )
+                )
+                logger.info(f"Collection '{collection_name}' created successfully.")
+        except Exception as e:
+            logger.error(f"Failed to verify/create Qdrant collection: {e}")
+            raise e
+            
+        embeddings = get_embedding_model()
+        _vector_store_instance = QdrantVectorStore(
+            client=client,
+            collection_name=collection_name,
+            embedding=embeddings
+        )
+    return _vector_store_instance
 
 def add_documents_to_store(chunks: List[Document]):
     if not chunks:

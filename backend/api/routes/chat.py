@@ -1,3 +1,4 @@
+import time
 from fastapi import APIRouter, HTTPException
 from api.schemas import ChatRequest, ChatResponse
 from storage.vector_store import search_vector_store
@@ -27,12 +28,14 @@ async def chat_with_law(request: ChatRequest):
     citations = []
     context_blocks = []
     
+    start_search = time.time()
     try:
         results = search_vector_store(
             query=request.question,
             topic_id=request.topic_id,
             k=5
         )
+        logger.info(f"Vector store search took {time.time() - start_search:.4f} seconds.")
         
         for doc in results:
             page_num = doc.metadata.get("page", 0) + 1
@@ -44,7 +47,7 @@ async def chat_with_law(request: ChatRequest):
             context_blocks.append(f"[Source: {citation_str}]\n{doc.page_content}")
             
     except Exception as qdrant_exc:
-        logger.error(f"Qdrant vector retrieval failed, triggering SQLite fallback: {qdrant_exc}")
+        logger.error(f"Qdrant vector retrieval failed after {time.time() - start_search:.4f}s, triggering SQLite fallback: {qdrant_exc}")
         is_fallback = True
         # Fetch overview summary from local SQLite
         topic_meta = get_topic_metadata(request.topic_id)
@@ -58,10 +61,12 @@ async def chat_with_law(request: ChatRequest):
     
     try:
         logger.info("Invoking LLM RAG Q&A chain...")
+        start_llm = time.time()
         answer = await rag_chain.ainvoke({
             "context": context if context else "No relevant context found.",
             "question": request.question
         })
+        logger.info(f"LLM generation took {time.time() - start_llm:.4f} seconds.")
         
         # Prepend a warning message if serving from fallback
         if is_fallback:
