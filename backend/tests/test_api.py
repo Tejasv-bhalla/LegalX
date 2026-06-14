@@ -87,3 +87,36 @@ def test_get_audio_success(mock_gen_file, mock_get_meta, client, tmp_path):
     assert response.status_code == 200
     assert response.headers["content-type"] == "audio/mpeg"
     assert response.content == b"dummy mp3 data"
+
+@patch("api.routes.chat.search_vector_store")
+@patch("api.routes.chat.rag_chain")
+def test_chat_stream_success(mock_rag, mock_search, client):
+    # Mock vector store search
+    mock_doc = MagicMock()
+    mock_doc.page_content = "Under POCSO section 4, penetrative sexual assault has a penalty."
+    mock_doc.metadata = {"page": 3, "source_file": "pocso.pdf"}
+    mock_search.return_value = [mock_doc]
+
+    # Mock rag_chain.astream to yield tokens
+    async def mock_astream(*args, **kwargs):
+        yield "The penalty "
+        yield "under POCSO "
+        yield "is life imprisonment."
+        
+    mock_rag.astream = mock_astream
+
+    payload = {"topic_id": "pocso", "question": "What is the penalty?"}
+    response = client.post("/api/chat/stream", json=payload)
+    
+    assert response.status_code == 200
+    assert "text/event-stream" in response.headers["content-type"]
+    
+    # Read response body chunks
+    body = response.content.decode("utf-8")
+    lines = body.split("\n\n")
+    
+    # Check that it yielded sources first, then tokens, and finally done
+    assert any("sources" in line and "pocso.pdf" in line for line in lines)
+    assert any("token" in line and "The penalty " in line for line in lines)
+    assert any("done" in line for line in lines)
+

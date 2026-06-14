@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { sendChatMessage, type ChatResponse } from '../lib/api';
+import { sendChatMessageStream } from '../lib/api';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { ScrollArea } from './ui/scroll-area';
@@ -41,20 +41,50 @@ export default function ChatInterface({ topicId }: ChatInterfaceProps) {
 
     setError(null);
     const userMessage: Message = { sender: 'user', text: textToSend };
-    setMessages((prev) => [...prev, userMessage]);
+    const assistantPlaceholder: Message = {
+      sender: 'assistant',
+      text: '',
+      sources: []
+    };
+
+    setMessages((prev) => [...prev, userMessage, assistantPlaceholder]);
     setInput('');
     setLoading(true);
 
     try {
-      const response: ChatResponse = await sendChatMessage(topicId, textToSend);
-      const assistantMessage: Message = {
-        sender: 'assistant',
-        text: response.answer,
-        sources: response.sources,
-      };
-      setMessages((prev) => [...prev, assistantMessage]);
+      await sendChatMessageStream(topicId, textToSend, (chunk) => {
+        setMessages((prev) => {
+          const updated = [...prev];
+          const lastMsgIndex = updated.length - 1;
+          if (lastMsgIndex >= 0 && updated[lastMsgIndex].sender === 'assistant') {
+            if (chunk.type === 'token' && chunk.token) {
+              updated[lastMsgIndex] = {
+                ...updated[lastMsgIndex],
+                text: updated[lastMsgIndex].text + chunk.token
+              };
+            } else if (chunk.type === 'sources' && chunk.sources) {
+              updated[lastMsgIndex] = {
+                ...updated[lastMsgIndex],
+                sources: chunk.sources
+              };
+            } else if (chunk.type === 'error' && chunk.detail) {
+              setError(chunk.detail);
+            }
+          }
+          return updated;
+        });
+      });
     } catch (err: any) {
       setError(err.message || 'Failed to connect to the AI reasoning server.');
+      // Remove the last blank assistant message if we got an error and it's empty
+      setMessages((prev) => {
+        const updated = [...prev];
+        const lastMsg = updated[updated.length - 1];
+        if (lastMsg && lastMsg.sender === 'assistant' && lastMsg.text === '') {
+          updated.pop();
+        }
+        return updated;
+      });
     } finally {
       setLoading(false);
     }
