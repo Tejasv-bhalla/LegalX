@@ -7,12 +7,16 @@ from core.logging_config import logger
 from storage.vector_store import get_embedding_model, init_vector_store
 from storage.database import init_db
 from api.routes import topics, chat, audio
+from core.exceptions import register_exception_handlers
 
 app = FastAPI(
     title="LegalX AI Knowledge Centre",
     description="Production-grade FastAPI backend service for layman legal assistant",
     version="2.0.0"
 )
+
+# Register custom exception handlers
+register_exception_handlers(app)
 
 # Configure CORS middleware
 origins = [
@@ -51,14 +55,6 @@ def startup_event():
         logger.info("Startup warmup complete. Server is ready.")
     except Exception as e:
         logger.critical(f"Warmup failed. Embedding model or Qdrant cluster is offline: {e}")
-
-@app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception):
-    logger.error(f"Global unhandled exception on {request.method} {request.url.path}: {exc}", exc_info=True)
-    return JSONResponse(
-        status_code=500,
-        content={"detail": "An internal server error occurred. Please try again later."}
-    )
 
 @app.get("/health")
 def health_check():
