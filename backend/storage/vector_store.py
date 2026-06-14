@@ -69,7 +69,7 @@ def add_documents_to_store(chunks: List[Document]):
     logger.info("Chunks uploaded to Qdrant successfully.")
 
 def search_vector_store(query: str, topic_id: str, k: int = 5) -> List[Document]:
-    logger.info(f"Searching vector store for query: '{query}' (scoped to topic: '{topic_id}')...")
+    logger.info(f"Searching vector store for query: '{query}' (scoped to topic: '{topic_id}') using MMR...")
     vector_store = init_vector_store()
     
     # BGE recommendation: prefix search queries with this instruction
@@ -85,12 +85,14 @@ def search_vector_store(query: str, topic_id: str, k: int = 5) -> List[Document]
         ]
     )
     
-    # Retrieve top k documents using similarity search with the filter
-    results = vector_store.similarity_search(
+    # Retrieve top k documents using MMR search to ensure diverse sections are fetched
+    results = vector_store.max_marginal_relevance_search(
         query=prefixed_query,
         k=k,
-        filter=payload_filter
+        fetch_k=12,         # Fetch 12 candidates first
+        filter=payload_filter,
+        lambda_mult=0.65    # Balance relevance vs diversity (0.65 is optimal for legal context)
     )
     
-    logger.info(f"Retrieved {len(results)} chunks from Qdrant.")
+    logger.info(f"Retrieved {len(results)} chunks from Qdrant using MMR.")
     return results
