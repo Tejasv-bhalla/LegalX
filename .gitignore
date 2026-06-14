@@ -13,7 +13,6 @@ frontend/.env
 frontend/.env.local
 
 # Databases & Caches
-backend/storage/legal_data.db
 backend/data/audio_cache/
 .pytest_cache/
 

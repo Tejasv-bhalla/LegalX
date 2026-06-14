@@ -18,4 +18,4 @@ COPY backend/ .
 # Warm up the local embedding model cache
 RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('BAAI/bge-small-en-v1.5')"
 
-CMD ["sh", "-c", "PYTHONPATH=. python scripts/update_metadata_only.py && uvicorn main:app --host 0.0.0.0 --port 8000"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
