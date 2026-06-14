@@ -1,6 +1,5 @@
 from typing import List
 from langchain_core.documents import Document
-from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_qdrant import QdrantVectorStore
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, Filter, FieldCondition, MatchValue
@@ -10,10 +9,11 @@ from core.logging_config import logger
 # Thread-safe singleton holder for embeddings
 _embeddings_instance = None
 
-def get_embedding_model() -> HuggingFaceEmbeddings:
+def get_embedding_model():
     global _embeddings_instance
     if _embeddings_instance is None:
-        logger.info("Initializing HuggingFaceEmbeddings with BAAI/bge-small-en-v1.5...")
+        logger.info("Lazy-loading HuggingFaceEmbeddings with BAAI/bge-small-en-v1.5...")
+        from langchain_community.embeddings import HuggingFaceEmbeddings
         # BGE-small-en-v1.5 is 384 dimensions
         _embeddings_instance = HuggingFaceEmbeddings(
             model_name="BAAI/bge-small-en-v1.5",
