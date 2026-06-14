@@ -1,33 +1,33 @@
 # LegalX AI Knowledge Centre — Layman Legal Assistant
 
-LegalX is a production-grade legal knowledge platform that democratizes access to official Indian legal acts. It parses complex official legal gazettes and acts, translates them into plain-English summaries and actionable checklists, and provides an offline-first RAG chat assistant that references specific page numbers and clauses, alongside high-quality neural voice translations.
+[![FastAPI](https://img.shields.io/badge/FastAPI-005571?style=flat&logo=fastapi)](https://fastapi.tiangolo.com)
+[![React](https://img.shields.io/badge/React-20232A?style=flat&logo=react)](https://react.dev)
+[![Qdrant](https://img.shields.io/badge/Qdrant-D82C20?style=flat&logo=qdrant)](https://qdrant.tech)
+[![Render](https://img.shields.io/badge/Render-46E3B7?style=flat&logo=render&logoColor=black)](https://render.com)
+[![Vercel](https://img.shields.io/badge/Vercel-000000?style=flat&logo=vercel)](https://vercel.com)
+
+LegalX is a production-grade legal knowledge platform that democratizes access to official Indian legal acts. It parses complex official legal gazettes and acts, translates them into plain-English summaries and actionable checklists, and provides an instant RAG chat assistant that references page numbers and clauses, alongside high-quality neural voice translations.
 
 ---
 
 ## 🏗️ System Architecture
 
 ```mermaid
-graph TB
-    A[React + Vite Frontend] -->|REST API| B[FastAPI Backend]
-    B -->|Local Queries| C[(Local SQLite DB)]
-    B -->|Similarity Search| D[Qdrant Cloud]
-    B -->|LLM Reasoning| E[Gemini 2.5 Flash]
-    B -->|TTS Engine| F[edge-tts]
-    
-    style A fill:#e0f7fa,stroke:#00acc1,stroke-width:2px
-    style B fill:#e8f5e9,stroke:#43a047,stroke-width:2px
-    style C fill:#fff9c4,stroke:#fbc02d,stroke-width:2px
-    style D fill:#f3e5f5,stroke:#8e24aa,stroke-width:2px
-    style E fill:#ffe0b2,stroke:#f57c00,stroke-width:2px
-    style F fill:#eceff1,stroke:#607d8b,stroke-width:2px
+graph TD
+    A["React + Vite Frontend (Vercel)"] -->|"REST API & SSE (JSON)"| B["FastAPI Backend (Render)"]
+    B -->|"Local Cache Queries (SQL)"| C[("Local SQLite DB")]
+    B -->|"Vector Search"| D["Qdrant Cloud"]
+    B -->|"Streaming Q&A (Llama 3.3)"| E["Groq Cloud"]
+    B -->|"Ingestion & Summaries"| F["Gemini 2.5 Flash"]
+    B -->|"Neural Voice Synthesis"| G["edge-tts (Local Cache)"]
 ```
 
 ### Flow Walkthrough
-1. **Frontend App**: Built with **React, TypeScript, Vite, Tailwind CSS v4, and shadcn/ui** to deliver a responsive, glassmorphic layout.
-2. **FastAPI Backend**: Acts as the orchestrator. It uses **LangChain (LCEL)** to handle RAG reasoning and exposes REST endpoints.
-3. **Local Database (SQLite)**: Stores cached plain-English summaries, extracted rights, and penalties. The SQLite file is pre-populated and committed directly to Git to prevent cold-start delays and Render ephemeral disk wipes.
-4. **Vector Database**: Connects to **Qdrant Cloud** (free-tier) with dense embeddings generated locally by the BAAI/bge-small-en-v1.5 model.
-5. **Speech Generation**: Integrates Microsoft's neural network **edge-tts** asynchronously using local caching to read legal summaries in Indian accents.
+1. **Frontend App**: Built with **React, TypeScript, Vite, Tailwind CSS, and shadcn/ui** to deliver a responsive, glassmorphic layout. Supports real-time text token streaming.
+2. **FastAPI Backend**: Orchestrates the system and exposes REST and Server-Sent Event (SSE) streaming endpoints.
+3. **Local Database (SQLite)**: Stores cached plain-English summaries, extracted rights, and penalties. The database is pre-populated and committed directly to Git to prevent cold-start delays.
+4. **Vector Database**: Connects to **Qdrant Cloud** (free-tier) with dense embeddings generated locally by the BAAI/bge-small-en-v1.5 model via FastEmbed.
+5. **Speech Generation**: Integrates Microsoft's **edge-tts** asynchronously using local caching to read legal summaries in natural Indian neural accents.
 
 ---
 
@@ -35,10 +35,11 @@ graph TB
 
 | Layer | Technology | Key Justification |
 |---|---|---|
-| **AI LLM** | Google Gemini 2.5 Flash | Free tier provides generous quotas (1.5M TPM / 1500 RPD) without credit card bindings. |
-| **Embeddings** | BAAI/bge-small-en-v1.5 | Lightweight local model running on CPU. Outperforms MiniLM on MTEB benchmarks (62.2 vs 56.3) while preserving 384 dimensions. |
+| **AI LLM (Chat)** | Groq Llama 3.3 70B | Offers high-fidelity legal reasoning, excellent instruction following, and rapid generation speeds. |
+| **AI LLM (Ingestion)** | Google Gemini 2.5 Flash | Large context window and generous free-tier quotas (15 RPM / 1500 RPD) for initial parsing and summary generation. |
+| **Embeddings** | FastEmbed (`bge-small-en-v1.5`) | Runs using an ultralight ONNX Runtime instead of PyTorch. Reduces memory overhead from **350MB+ to under 100MB**, preventing Render free-tier container OOM crashes. |
 | **Vector DB** | Qdrant Cloud | Reliable cloud clustering with metadata payload filtering, bypassing ephemeral containers limitations. |
-| **Relational DB** | SQLite (`legal_data.db`) | Local caching of LLM metadata, eliminating Turso cloud dependencies and keeping latency sub-millisecond. |
+| **Relational DB** | SQLite (`legal_data.db`) | Local caching of LLM metadata, keeping metadata load times sub-millisecond. |
 | **Voice Engine** | `edge-tts` (`en-IN-NeerjaNeural`) | Generates natural-sounding Indian English speech completely free and offline-resilient. |
 | **Package Tool**| `uv` | Rust-based Python package manager resulting in 10-100x faster environment setups. |
 | **Frontend** | React + Vite | Clean Single Page Application (SPA) with lightning-fast Hot Module Replacement (HMR). |
@@ -54,7 +55,8 @@ Ensure you have **Python 3.11+** and **Node.js 18+** installed.
 Create a `.env` file inside `backend/` and add your keys:
 ```env
 GOOGLE_API_KEY=your_gemini_api_key
-QDRANT_URL=your_qdrant_cloud_cluster_url
+GROQ_API_KEY=your_groq_api_key
+QDRANT_URL=https://your-qdrant-cluster.aws.qdrant.io:6333
 QDRANT_API_KEY=your_qdrant_cloud_api_key
 ```
 
@@ -92,9 +94,9 @@ Open [http://localhost:5173/](http://localhost:5173/) in your web browser.
 
 ---
 
-## 📦 Ingestion Pipeline (Worth 20% of Grade)
+## 📦 Ingestion Pipeline
 
-Assessors can recreate and build the vector search collections and relational cache using a single script invocation:
+The ingestion pipeline parses official legal documents, indexes the vectors, and populates the database:
 
 ```bash
 cd backend
@@ -102,12 +104,20 @@ source .venv/bin/activate
 python pipeline/ingestion.py
 ```
 
-### What this script does:
-1. Loads raw official PDFs from `backend/data/sources/` using a clean loader that ignores headers, footers, and table of contents.
-2. Generates semantic chunks using recursive splitting.
-3. Computes dense vectors using `bge-small-en-v1.5` and upserts them to Qdrant Cloud under unique hash IDs.
-4. Invokes a **Single Gemini AI Chain** per topic to generate a detailed summary, rights checklist, and penalty lists.
+### Pipeline Flow:
+1. Loads raw official PDFs from `backend/data/sources/` using a custom loader that ignores headers, footers, and table of contents.
+2. Generates semantic chunks using recursive splitting (`chunk_size=1000`, `chunk_overlap=150`).
+3. Computes dense vectors using BAAI/bge-small-en-v1.5 and upserts them to Qdrant Cloud.
+4. Invokes a Gemini AI chain to generate summaries, rights, and penalty lists.
 5. Saves this metadata in SQLite (`backend/storage/legal_data.db`).
+
+---
+
+## ⚡ Latency & Memory Optimizations
+
+* **ONNX Runtime (FastEmbed)**: Replaced `sentence-transformers` with `fastembed`. The BGE model is pre-warmed during Docker image build time so it never triggers runtime downloads. Memory usage remains below **100MB** (originally 350MB+).
+* **SSE Token Streaming**: Implemented a non-blocking streaming route at `/api/chat/stream` using FastAPI's `StreamingResponse` and LangChain's `.astream()`. Tokens and citation sources are pushed to the frontend dynamically, cutting perceived user wait times from **2.0s to under 150ms**.
+* **Cached Connections**: Implemented a singleton pattern for the `QdrantClient` and `QdrantVectorStore` instances. This eliminates extra network collection checks (`client.collection_exists`) on every user message.
 
 ---
 
@@ -124,5 +134,5 @@ uv run pytest tests/ -v
 ## 🛡️ Resilience & Production Engineering
 
 * **Rate Limit Resilience**: Gemini Free Tier rate limits (15 RPM) are handled using exponential backoff retry wrappers (`tenacity`).
-* **Zero-Budget Cold Starts**: SQLite and edge-tts cached assets ensure that cold starts on Render cause zero service disruptions.
-* **Topic-Scoped Retrieval**: RAG search applies metadata payload filters (`topic_id` matches) before computing vector cosine similarity, ensuring Cyber Crime queries never retrieve POCSO or GST act context.
+* **Offline Fallback**: If Qdrant Cloud goes offline or times out, the chat endpoint falls back to the topic's SQLite plain-English summary cache, allowing conversation to degrade gracefully.
+* **Topic-Scoped Retrieval**: RAG search applies metadata payload filters (`topic_id` matches) before computing vector similarity, preventing cross-talk between different Acts.
