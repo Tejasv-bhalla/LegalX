@@ -46,15 +46,6 @@ def startup_event():
         init_db()
     except Exception as e:
         logger.error(f"Failed to initialize database during startup: {e}")
-        
-    # 2. Pre-load/warm up the local BGE embedding model into memory
-    # This avoids cold-start delays on the first API request.
-    try:
-        get_embedding_model()
-        init_vector_store()
-        logger.info("Startup warmup complete. Server is ready.")
-    except Exception as e:
-        logger.critical(f"Warmup failed. Embedding model or Qdrant cluster is offline: {e}")
 
 @app.get("/health")
 def health_check():
