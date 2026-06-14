@@ -12,15 +12,13 @@ _embeddings_instance = None
 def get_embedding_model():
     global _embeddings_instance
     if _embeddings_instance is None:
-        logger.info("Lazy-loading HuggingFaceEmbeddings with BAAI/bge-small-en-v1.5...")
-        from langchain_community.embeddings import HuggingFaceEmbeddings
-        # BGE-small-en-v1.5 is 384 dimensions
-        _embeddings_instance = HuggingFaceEmbeddings(
-            model_name="BAAI/bge-small-en-v1.5",
-            model_kwargs={"device": "cpu"},
-            encode_kwargs={"normalize_embeddings": True}
+        logger.info("Initializing lightweight FastEmbedEmbeddings with BAAI/bge-small-en-v1.5...")
+        from langchain_community.embeddings.fastembed import FastEmbedEmbeddings
+        # FastEmbed is extremely low memory and runs BGE-small-en-v1.5 (384 dimensions)
+        _embeddings_instance = FastEmbedEmbeddings(
+            model_name="BAAI/bge-small-en-v1.5"
         )
-        logger.info("Embedding model loaded successfully.")
+        logger.info("FastEmbed embedding model loaded successfully.")
     return _embeddings_instance
 
 def get_qdrant_client() -> QdrantClient:

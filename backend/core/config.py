@@ -14,8 +14,8 @@ class Settings(BaseSettings):
     qdrant_api_key: str
     qdrant_collection: str = "legal_docs"
     
-    # Relational metadata (SQLite)
-    sqlite_db_path: str = "storage/legal_data.db"
+# Relational metadata (SQLite)
+    sqlite_db_path: str = str(Path(__file__).resolve().parent.parent / "storage" / "legal_data.db")
     
     # App Settings
     debug: bool = False
